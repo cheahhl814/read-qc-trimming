@@ -7,6 +7,9 @@ Phase 1: Raw QC        →  sequali + multiqc
 Phase 2: Trim/Clean     →  fastp / fastplong / trim_galore
 Phase 3: Post-Trim QC   →  sequali + multiqc (again)
 Phase 4: Go/No-Go       →  compare before vs after
+       ├─ ALL PASS → GO: proceed to alignment
+       ├─ FAIL → adjust params → return to Phase 2 (max 3 iterations)
+       └─ Systemic batch FAIL → STOP: report to user
 ```
 
 ## Why Merged?

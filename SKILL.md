@@ -33,8 +33,13 @@ End-to-end quality control and trimming for sequencing reads. Follows a **sandwi
 │  read loss <10%                                      │
 ├─────────────────────────────────────────────────────┤
 │  Phase 4: Go/No-Go    (compare before vs after)      │
-│  Decision: proceed to alignment/assembly, or        │
-│  re-trim with adjusted parameters                   │
+│  ┌── GO ──→ Proceed to alignment/assembly            │
+│  │                                                    │
+│  └── NO → Adjust parameters ──→ Return to Phase 2 ──┐│
+│       (max 3 iterations, then STOP & report)       ││
+│                                                     ││
+│  Multiple systemic FAIL across batch?               ││
+│  ──→ STOP: Library prep issue, report to user      ││
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -61,13 +66,13 @@ pixi add sequali multiqc fastp fastplong trim_galore
 
 Determine read type from file metadata or user context to set correct quality thresholds:
 
-| Platform | Read Type | Expected Read Length | Quality Profile |
-|----------|-----------|---------------------|-----------------|
-| Illumina (NovaSeq/NextSeq) | Short, paired | 75-300 bp | High Q30+, 3' poly-G tails |
-| Illumina (MiSeq) | Short, paired | 150-300 bp | High Q30+, no poly-G |
-| Oxford Nanopore | Long, single | 1-100+ kb | Variable Q7-15, 5' quality decay |
-| PacBio HiFi | Long, single | 10-25 kb | High Q30+ (CCS) |
-| PacBio CLR | Long, single | 10-50 kb | Low Q12-15 |
+| Platform                   | Read Type     | Expected Read Length | Quality Profile                  |
+| -------------------------- | ------------- | -------------------- | -------------------------------- |
+| Illumina (NovaSeq/NextSeq) | Short, paired | 75-300 bp            | High Q30+, 3' poly-G tails       |
+| Illumina (MiSeq)           | Short, paired | 150-300 bp           | High Q30+, no poly-G             |
+| Oxford Nanopore            | Long, single  | 1-100+ kb            | Variable Q7-15, 5' quality decay |
+| PacBio HiFi                | Long, single  | 10-25 kb             | High Q30+ (CCS)                  |
+| PacBio CLR                 | Long, single  | 10-50 kb             | Low Q12-15                       |
 
 ### 1.2 Run Sequali
 
@@ -94,18 +99,19 @@ multiqc qc_raw/ --no-report --data-format json -o qc_summary_raw/
 Read results in this priority order:
 
 **Triage** (`qc_summary_raw/multiqc_data.json`):
+
 - Multiple samples `FAIL` the same module → systematic library prep issue
 - Single sample `FAIL` → sample-specific problem
 
 **Per-Sample Deep Dive** (`qc_raw/<sample>.json`):
 
-| Observation | Inference | Action |
-|-------------|-----------|--------|
-| Per-base quality drops below Q20 at 3' end | Quality decay | Plan tail trimming (`-q 20`) |
-| Adapter content > 0% | Contamination | Plan adapter removal |
-| GC content deviates from expected | Contamination or bias | Flag as Warning |
+| Observation                                | Inference                         | Action                          |
+| ------------------------------------------ | --------------------------------- | ------------------------------- |
+| Per-base quality drops below Q20 at 3' end | Quality decay                     | Plan tail trimming (`-q 20`)    |
+| Adapter content > 0%                       | Contamination                     | Plan adapter removal            |
+| GC content deviates from expected          | Contamination or bias             | Flag as Warning                 |
 | Read length variance is high (short reads) | Fragmented DNA or poor clustering | Plan length filtering (`-l 15`) |
-| Overrepresented sequences > 1% | Adapter/contaminant | Identify and remove |
+| Overrepresented sequences > 1%             | Adapter/contaminant               | Identify and remove             |
 
 **Record these findings** — they determine the Phase 2 parameters.
 
@@ -115,11 +121,11 @@ Read results in this priority order:
 
 Based on Phase 1 findings and read platform:
 
-| Data Type | Tool | When to Use |
-|-----------|------|------------|
-| **Short-read (standard)** | `fastp` | Default choice — fast, auto adapter detection, integrated QC |
+| Data Type                        | Tool          | When to Use                                                           |
+| -------------------------------- | ------------- | --------------------------------------------------------------------- |
+| **Short-read (standard)**        | `fastp`       | Default choice — fast, auto adapter detection, integrated QC          |
 | **Short-read (high stringency)** | `trim_galore` | When fastp fails to remove complex adapters or specific kit artifacts |
-| **Long-read (ONT/PacBio)** | `fastplong` | Optimized for long-read error profiles and length distributions |
+| **Long-read (ONT/PacBio)**       | `fastplong`   | Optimized for long-read error profiles and length distributions       |
 
 ### 2.2 Execute Trimming
 
@@ -137,13 +143,13 @@ fastp -i R1.fq.gz -I R2.fq.gz \
 
 **Parameter tuning based on Phase 1 findings:**
 
-| Phase 1 Finding | Parameter | Value |
-|-----------------|-----------|-------|
-| 3' quality decay below Q20 | `-q` | 20 (or higher for stricter) |
-| Many short reads after quality trim | `-l` | 15 (or 20 to be more aggressive) |
-| NovaSeq/NextSeq poly-G tails | `--trim_poly_g` | Always enable for these platforms |
-| Adapter detected (auto) | fastp auto-detects | No explicit flag needed |
-| Per-read low-quality bases > 40% | `-u` | 40 (allow 40% low-quality bases per read) |
+| Phase 1 Finding                     | Parameter          | Value                                     |
+| ----------------------------------- | ------------------ | ----------------------------------------- |
+| 3' quality decay below Q20          | `-q`               | 20 (or higher for stricter)               |
+| Many short reads after quality trim | `-l`               | 15 (or 20 to be more aggressive)          |
+| NovaSeq/NextSeq poly-G tails        | `--trim_poly_g`    | Always enable for these platforms         |
+| Adapter detected (auto)             | fastp auto-detects | No explicit flag needed                   |
+| Per-read low-quality bases > 40%    | `-u`               | 40 (allow 40% low-quality bases per read) |
 
 #### fastplong (Long Reads)
 
@@ -157,11 +163,11 @@ fastplong -i input.fq.gz -o trimmed/output.fq.gz \
 
 **Parameter tuning:**
 
-| Phase 1 Finding | Parameter | Value |
-|-----------------|-----------|-------|
-| Low-quality regions within reads | `--mask` | Replaces with N (preserves length) |
-| Entire reads are low quality | `--break` | Discards read (aggressive — use only if `--mask` is insufficient) |
-| Poly-A/G tails in cDNA data | `--trim_poly_x` | Enable with `--poly_x_min_len 10` |
+| Phase 1 Finding                  | Parameter       | Value                                                             |
+| -------------------------------- | --------------- | ----------------------------------------------------------------- |
+| Low-quality regions within reads | `--mask`        | Replaces with N (preserves length)                                |
+| Entire reads are low quality     | `--break`       | Discards read (aggressive — use only if `--mask` is insufficient) |
+| Poly-A/G tails in cDNA data      | `--trim_poly_x` | Enable with `--poly_x_min_len 10`                                 |
 
 #### trim_galore (High-Stringency Short Reads)
 
@@ -176,13 +182,13 @@ trim_galore --paired --quality 20 --length 20 \
 
 **Kit presets:**
 
-| Kit/Platform | Flag | Notes |
-|-------------|------|-------|
-| Nextera | `--nextera` | Common for ATAC-seq |
-| Small RNA | `--small_rna` | Retains short reads |
-| BGI/MGI | `--bgiseq` | BGI-specific adapters |
-| TruSeq (default) | (none) | Auto-detected by fastp |
-| 5' bias (e.g., degraded FFPE) | `--hardtrim5 N` | Remove first N bases |
+| Kit/Platform                  | Flag            | Notes                  |
+| ----------------------------- | --------------- | ---------------------- |
+| Nextera                       | `--nextera`     | Common for ATAC-seq    |
+| Small RNA                     | `--small_rna`   | Retains short reads    |
+| BGI/MGI                       | `--bgiseq`      | BGI-specific adapters  |
+| TruSeq (default)              | (none)          | Auto-detected by fastp |
+| 5' bias (e.g., degraded FFPE) | `--hardtrim5 N` | Remove first N bases   |
 
 ### 2.3 Record Trimming Stats
 
@@ -219,7 +225,31 @@ sequali trimmed/R1_trimmed.fq.gz trimmed/R2_trimmed.fq.gz \
 multiqc qc_trimmed/ -o qc_summary_trimmed/
 ```
 
-## Phase 4: Go/No-Go Decision
+## Phase 4: Go/No-Go Decision Loop
+
+This is an **iterative loop**, not a one-time decision. If trimming criteria fail,
+adjust parameters and re-run from Phase 2. Maximum 3 iterations before escalating.
+
+```
+Phase 4 Go/No-Go
+  │
+  ├─ ALL PASS ──→ GO: Proceed to alignment/assembly
+  │
+  ├─ Adapter FAIL ──→ Adjust: switch tool or specify adapter ──→ Phase 2
+  │
+  ├─ Quality FAIL ──→ Adjust: raise -q threshold ──→ Phase 2
+  │
+  ├─ Read loss > 20% ──→ Adjust: loosen -l or -q ──→ Phase 2
+  │
+  ├─ GC shift > 5% ──→ Adjust: check for over-trimming ──→ Phase 2
+  │
+  ├─ N50 drop > 20% ──→ Adjust: switch --break to --mask ──→ Phase 2
+  │
+  │
+  ├─ After 3 iterations ──→ STOP: Flag as "requires manual review"
+  │
+  └─ Systemic batch FAIL ──→ STOP: Library prep issue, report to user
+```
 
 ### 4.1 Compare Before vs After
 
@@ -231,32 +261,30 @@ diff <(cat qc_summary_raw/multiqc_data.json | python3 -m json.tool) \
 
 ### 4.2 Go/No-Go Criteria
 
-| Criterion | Pass Threshold | Action if Fail |
-|-----------|---------------|----------------|
-| Adapter content | ≈ 0% | Switch tool (fastp → trim_galore) or specify adapter manually |
-| Per-base quality | Q20+ across full length | Increase `-q` threshold and re-trim |
-| Read loss | < 10% total | Acceptable loss; if > 20%, loosen parameters |
-| GC content shift | < 5% change from raw | If > 5%, check for over-trimming or contamination removal |
-| N50 preservation (long reads) | > 80% of raw N50 | Switch from `--break` to `--mask` |
+| Criterion                     | Pass Threshold          | Fail → Adjust                                               | Max Iterations |
+| ----------------------------- | ----------------------- | ----------------------------------------------------------- | -------------- |
+| Adapter content               | ≈ 0%                    | Switch tool (fastp→trim_galore) or specify adapter manually | 3              |
+| Per-base quality              | Q20+ across full length | Increase `-q` threshold                                     | 3              |
+| Read loss                     | < 10% total             | Loosen `-l` or `-q`; if > 20%, flag as degraded             | 3              |
+| GC content shift              | < 5% change from raw    | Check for over-trimming or contamination removal            | 3              |
+| N50 preservation (long reads) | > 80% of raw N50        | Switch `--break` to `--mask`                                | 3              |
 
-### 4.3 Decision Matrix
+### 4.3 Iteration Protocol
 
-```
-All criteria PASS → GO: Proceed to alignment/assembly
-                      Output: trimmed/*.fq.gz + qc_trimmed/multiqc_data.json
+On each failed iteration:
 
-Adapter content FAIL → Re-trim with different tool or manual adapter flag
+1. **Identify** which criterion failed from Phase 3 QC
+2. **Adjust** the corresponding trimming parameter (see table above)
+3. **Re-run** Phase 2 with new parameters (overwrite previous trimmed output)
+4. **Re-run** Phase 3 QC on the new trimmed output
+5. **Re-evaluate** at Phase 4
 
-Quality still FAIL   → Re-trim with stricter -q threshold
-                      or flag sample as "requires manual review"
+After **3 iterations** without all criteria passing:
 
-Read loss > 20%      → Loosen -l or -q parameters
-                      or flag as "degraded sample"
-
-Multiple systemic
-FAIL across batch     → STOP: Library prep issue
-                      Report to user before proceeding
-```
+- **STOP** the pipeline
+- Flag the sample as "requires manual review"
+- Report all iteration results to the user
+- Include the raw QC, all trimming attempts, and final post-trim QC
 
 ### 4.4 Output Summary
 
@@ -287,6 +315,7 @@ After a GO decision, the agent should produce:
 - GC content: <Y>% (delta from raw: <d>%)
 
 ### Decision: GO ✓
+### Iterations: <N> (if > 1, list parameter changes)
 ```
 
 ## Pitfalls
@@ -306,6 +335,8 @@ After a GO decision, the agent should produce:
 - [ ] Phase 2 (Trim): Trimming tool selected based on Phase 1 findings and platform
 - [ ] Phase 3 (Post-Trim QC): `sequali` and `multiqc` ran successfully on trimmed reads
 - [ ] Phase 4 (Go/No-Go): All criteria pass — adapter content ≈ 0%, quality restored, read loss < 10%
+- [ ] If Phase 4 failed: iterations documented with parameter changes per attempt
+- [ ] If 3+ iterations: flagged as "requires manual review" with full iteration history
 - [ ] Output files match input count for paired-end data (R1 and R2 have same line counts)
 - [ ] Summary report produced with before/after comparison
 
