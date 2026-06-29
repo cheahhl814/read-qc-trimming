@@ -1,9 +1,24 @@
 ---
 name: "read-qc-trimming"
 description: "End-to-end read quality control and trimming pipeline. QC raw reads (sequali + multiqc), identify issues, trim/clean (fastp/fastplong/trim_galore), then QC trimmed reads to verify. Sandwich pattern: QC → Trim → QC → Go/No-Go."
-version: 1
-created: "2026-06-27"
-updated: "2026-06-27"
+version: 2
+updated: "2026-06-29"
+triggers:
+  - "quality control reads"
+  - "trim reads"
+  - "QC fastq"
+  - "clean raw reads"
+  - "sequali"
+  - "fastp"
+  - "trim_galore"
+  - "fastplong"
+  - "read QC"
+  - "read trimming"
+  - "raw read quality"
+  - "multiqc QC"
+  - "sequencing quality check"
+  - "adapter trimming"
+  - "QC before alignment"
 requires:
   - "sequali (conda: bioconda) — platform-agnostic QC metric generation"
   - "multiqc (conda: bioconda) — aggregate QC reporting"
