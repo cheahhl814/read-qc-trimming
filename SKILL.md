@@ -1,8 +1,8 @@
 ---
 name: "read-qc-trimming"
 description: "End-to-end read quality control and trimming pipeline. QC raw reads (sequali + multiqc), identify issues, trim/clean (fastp/fastplong/trim_galore), then QC trimmed reads to verify. Sandwich pattern: QC → Trim → QC → Go/No-Go."
-version: 2
-updated: "2026-06-29"
+version: 3
+updated: "2026-08-14"
 triggers:
   - "quality control reads"
   - "trim reads"
@@ -169,9 +169,9 @@ fastp -i R1.fq.gz -I R2.fq.gz \
 #### fastplong (Long Reads)
 
 ```bash
-# Long-read cleaning with quality masking
+# Long-read cleaning with cut-window quality trimming
 fastplong -i input.fq.gz -o trimmed/output.fq.gz \
-          --mask --mask_mean_quality 10 \
+          -M 10 --cut_front --cut_tail \
           --trim_poly_x --poly_x_min_len 10 \
           --json trimmed/fastplong.json
 ```
@@ -180,8 +180,7 @@ fastplong -i input.fq.gz -o trimmed/output.fq.gz \
 
 | Phase 1 Finding                  | Parameter       | Value                                                             |
 | -------------------------------- | --------------- | ----------------------------------------------------------------- |
-| Low-quality regions within reads | `--mask`        | Replaces with N (preserves length)                                |
-| Entire reads are low quality     | `--break`       | Discards read (aggressive — use only if `--mask` is insufficient) |
+| Low-quality regions within reads | `-M` + `--cut_front`/`--cut_tail` | Cut-window mean-quality threshold (e.g. `-M 10`), trims from both ends. **Note:** fastplong has no `--mask`/`--break` flags — unlike some other long-read tools, it truncates low-quality windows rather than masking bases with `N`. Reads get shorter, not N-replaced. |
 | Poly-A/G tails in cDNA data      | `--trim_poly_x` | Enable with `--poly_x_min_len 10`                                 |
 
 #### trim_galore (High-Stringency Short Reads)
@@ -258,7 +257,7 @@ Phase 4 Go/No-Go
   │
   ├─ GC shift > 5% ──→ Adjust: check for over-trimming ──→ Phase 2
   │
-  ├─ N50 drop > 20% ──→ Adjust: switch --break to --mask ──→ Phase 2
+  ├─ N50 drop > 20% ──→ Adjust: lower -M threshold or disable one of --cut_front/--cut_tail ──→ Phase 2
   │
   │
   ├─ After 3 iterations ──→ STOP: Flag as "requires manual review"
@@ -282,7 +281,7 @@ diff <(cat qc_summary_raw/multiqc_data.json | python3 -m json.tool) \
 | Per-base quality              | Q20+ across full length | Increase `-q` threshold                                     | 3              |
 | Read loss                     | < 10% total             | Loosen `-l` or `-q`; if > 20%, flag as degraded             | 3              |
 | GC content shift              | < 5% change from raw    | Check for over-trimming or contamination removal            | 3              |
-| N50 preservation (long reads) | > 80% of raw N50        | Switch `--break` to `--mask`                                | 3              |
+| N50 preservation (long reads) | > 80% of raw N50        | Lower `-M` threshold or disable one of `--cut_front`/`--cut_tail` (fastplong truncates, so aggressive cut-window settings shorten reads more than expected) | 3              |
 
 ### 4.3 Iteration Protocol
 
@@ -337,7 +336,7 @@ After a GO decision, the agent should produce:
 
 - **Over-trimming**: Setting `-l` (min length) too high in `fastp` can discard a huge percentage of a library, especially degraded samples. Always check Phase 3 read loss.
 - **Wrong adapter preset**: Using `--nextera` in `trim_galore` for a TruSeq library will not remove adapters. Verify the kit used.
-- **Long-read fragmentation**: Using `--break` in `fastplong` on raw Nanopore data often destroys too many reads. `--mask` is generally safer for assembly.
+- **Long-read fragmentation**: `fastplong` has no `--mask`/`--break` flags (unlike some other long-read tools) — it always trims via cut-window (`-M` + `--cut_front`/`--cut_tail`), which truncates rather than N-masks. An aggressive `-M` threshold on raw Nanopore data can destroy too many reads; if N50 drops sharply, lower `-M` or trim only one end.
 - **Poly-G tails on NovaSeq/NextSeq**: Always use `--trim_poly_g` for these platforms. Not enabling it will inflate adapter content in Phase 3.
 - **uBAM handling**: When using uBAM files, ensure they contain quality scores; otherwise QC metrics will be empty.
 - **Biological artifacts vs contamination**: High overrepresentation may be biological (e.g., specific motifs in a target gene). Flag as "Observation" not "Failure" unless it conflicts with the project goal.
