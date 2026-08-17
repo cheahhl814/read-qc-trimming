@@ -45,6 +45,51 @@ Do NOT use this skill if:
 - You want to QC immediately — this skill is the gate, not the QC itself.
 - You are working with **already-trimmed** reads — they should bypass QC and go straight to assembly / mapping.
 
+## 0.0 Pre-run Confirmation Gate
+
+> **Always fire this gate before collecting any evidence.** It is the one place where the agent must wait for the user's explicit "proceed" before doing anything else. The format is **Evidence + Recommend + Options**.
+
+Before the first evidence step (§1.1), the agent enumerates the files it would audit and asks the user to confirm. This catches path errors, wrong-directory accidents, and surprise-md5 decisions before any work is done.
+
+**Trigger**: ALWAYS (this is not a conditional stop point — it is the entry gate).
+
+**Evidence shown to the user** (read from the filesystem, do not invent):
+
+```
+$RUN_DIR: <path>
+Files detected:
+  - <file 1 name>  <size>  <md5 sidecar: yes/no>
+  - <file 2 name>  <size>  <md5 sidecar: yes/no>
+  - <file 3 name>  <size>  <md5 sidecar: yes/no>
+  - (... any additional FASTQ / uBAM in $RUN_DIR that matches the canonical naming)
+Files NOT detected (will be skipped unless you confirm a non-canonical path):
+  - <file 1 name>  <size>  (not in the canonical raw_R1/R2/long naming)
+```
+
+**Recommended message** (the agent must format using this template):
+
+> "I'll preflight the following files at `$RUN_DIR`:
+> - `<file 1>` (4.2 GB, md5 sidecar present)
+> - `<file 2>` (4.2 GB, no md5 sidecar)
+> Do you want me to proceed?
+> (A) Yes, run preflight now
+> (B) No — let me point you at different files
+> (C) Show me everything in `$RUN_DIR/` (in case I missed a file)"
+
+**Behavior**:
+
+| User choice | Action |
+| --- | --- |
+| A (Yes) | Proceed to §1.1 (evidence collection). |
+| B (No) | HARD stop. Do not collect any evidence. Ask the user to re-run with correct paths. |
+| C (Show all) | Enumerate every FASTQ / uBAM / uBAM.bai in `$RUN_DIR` (including non-canonical names), show sizes + md5 sidecar status, then re-ask the original confirmation question. |
+| User types a custom path | HARD stop. Re-run this gate with the user-supplied path as the new `$RUN_DIR`. Do not silently accept. |
+| User says "trust me, just go" | Acceptable. Record the user's bypass in `preflight_evidence.txt` as `=== 0.0 PRE-RUN CONFIRMATION === user bypassed pre-run confirmation gate at <timestamp>`. Proceed to §1.1. |
+
+**Why this is not a stop point**: SP1–SP3 fire *during* evidence collection when the evidence is ambiguous. The pre-run confirmation fires *before* any evidence is collected — wrong directory, wrong file, or wrong intent. Different shape, different timing. Listed under §0.0 instead of §0.5 to keep the existing SP numbering stable.
+
+**Tests must enforce**: the pre-run confirmation section must be present in the SKILL.md, and the master SKILL.md must reference it from the Phase 0 walkthrough.
+
 ## 0. Inputs / Outputs contract
 
 ### Inputs (consumed)

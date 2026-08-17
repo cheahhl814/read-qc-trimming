@@ -158,6 +158,80 @@ class TestStopPoints(unittest.TestCase):
         )
 
 
+class TestPreRunConfirmationGate(unittest.TestCase):
+    """The pre-run confirmation gate (always fires, before evidence)."""
+
+    def setUp(self):
+        self.text = _read(PREFLIGHT)
+
+    def test_gate_section_present(self):
+        self.assertRegex(
+            self.text,
+            r"## 0\.0 Pre-run Confirmation Gate",
+            "Pre-run confirmation gate must be a top-level section",
+        )
+
+    def test_gate_always_fires(self):
+        # The gate must be unconditional (not a stop point)
+        self.assertRegex(
+            self.text,
+            r"ALWAYS|always fire|always fires",
+            "Pre-run confirmation gate must always fire",
+        )
+
+    def test_gate_has_yes_no_options(self):
+        # The agent must offer A/B/C — yes / no / show all
+        self.assertRegex(
+            self.text,
+            r"\(A\) Yes|\(B\) No|\(C\) Show",
+            "Pre-run confirmation must offer A/B/C options",
+        )
+
+    def test_gate_hard_stops_on_no(self):
+        # A "No" must be a HARD stop, not a soft skip
+        self.assertRegex(
+            self.text,
+            r"B \(No\)\s*\|[^|]*HARD",
+            "Pre-run confirmation No must HARD stop",
+        )
+
+    def test_gate_records_bypass(self):
+        # A "trust me, just go" answer must be recorded in preflight_evidence.txt
+        self.assertRegex(
+            self.text,
+            r"trust me|user bypassed|=== 0\.0",
+            "Pre-run confirmation must record user bypasses",
+        )
+
+    def test_gate_distinct_from_stop_points(self):
+        # The gate must NOT be in the SP numbering (it is §0.0, not SP4)
+        self.assertNotRegex(
+            self.text,
+            r"### SP4[^0-9]",
+            "Pre-run confirmation must not be SP4",
+        )
+
+
+class TestPreRunConfirmationInMasterSkill(unittest.TestCase):
+    """The master SKILL.md must reference the pre-run confirmation gate."""
+
+    def setUp(self):
+        self.text = _read(MASTER)
+
+    def test_phase_0_mentions_confirmation_gate(self):
+        self.assertRegex(
+            self.text,
+            r"[Pp]re-run confirmation gate|confirmation gate",
+        )
+
+    def test_followups_has_bypass_entry(self):
+        self.assertRegex(
+            self.text,
+            r"trust me|bypass",
+            "Common follow-ups must include the bypas-strust-me entry",
+        )
+
+
 class TestMasterSkillCoherence(unittest.TestCase):
     """The master SKILL.md must advertise the preflight as v4."""
 

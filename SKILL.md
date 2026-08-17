@@ -90,6 +90,8 @@ If you trust the inputs (e.g., a collaborator already validated them, or you're 
 
 Run the sub-skill at `preflight/sequali-input-preflight/`. It audits input files, validates md5 if provided, checks paired-end parity, and detects platform. Output: `params.json` (machine contract) + `preflight.md` (human audit) + `preflight_evidence.txt` (raw evidence).
 
+**Pre-run confirmation gate**: before collecting any evidence, the sub-skill shows the user the list of files it will audit and asks for confirmation (yes / no / show all). This catches path errors and wrong-directory accidents before any work is done. The gate always fires — it is not conditional on evidence. See `preflight/sequali-input-preflight/SKILL.md` §0.0 for the message template and behavior.
+
 **Verdict gate**: Phase 1 and Phase 2 refuse to run without `preflight.md` verdict ≥ `GO-WITH-WARNINGS`. If you skip Phase 0, the master skill does NOT block Phase 1 — the gate is opt-in via the sub-skill. Use the preflight whenever the input provenance is unclear or the data is from a new source.
 
 **For full preflight documentation, see** [`preflight/sequali-input-preflight/SKILL.md`](preflight/sequali-input-preflight/SKILL.md). Summary of what it does:
@@ -405,6 +407,8 @@ After a GO decision, the agent should produce:
 | User says | What to do |
 | --- | --- |
 | "Run preflight before QC" | Invoke `preflight/sequali-input-preflight/`. It audits input files, validates md5 if provided, checks paired-end parity, and detects platform. The output (`params.json` + `preflight.md`) gates Phase 1 — without a `GO` or `GO-WITH-WARNINGS` verdict, Phase 1 should refuse. |
+| "Pre-flight confirmation gate is annoying, skip it" | Acceptable. The pre-run gate accepts a "trust me, just go" answer and records the bypass in `preflight_evidence.txt`. The gate is intended for catching wrong-directory/wrong-file accidents, not for blocking trust. |
+| "I want to preflight a different directory" | HARD stop on the current gate. Re-run the sub-skill with the new path. The agent must not silently accept a different `$RUN_DIR` mid-run. |
 | "md5 check failed" | HARD stop. Do not silently re-download. Ask the user to inspect the partial download / transfer. The preflight is read-only and must NOT delete files. |
 | "R1 and R2 read counts differ" | HARD stop. This will crash `fastp` mid-run. Recommend re-extracting from the source FASTQ or re-downloading both files together. |
 | "What platform is this?" | Read `$RUN_DIR/params.json` → `platform.detected`. If `ambiguous` (avg read length between 800 bp and 1.2 kb), ask the user to confirm. |
