@@ -1,8 +1,9 @@
 # Read QC & Trimming Pipeline
 
-End-to-end quality control and trimming for sequencing reads. **Sandwich pattern**: QC raw reads → trim/clean → QC trimmed reads → Go/No-Go decision.
+End-to-end quality control and trimming for sequencing reads. **Sandwich pattern**: optional preflight → QC raw reads → trim/clean → QC trimmed reads → Go/No-Go decision.
 
 ```
+Phase 0: Preflight      →  input audit + md5 + paired parity + platform detect  (optional)
 Phase 1: Raw QC        →  sequali + multiqc
 Phase 2: Trim/Clean     →  fastp / fastplong / trim_galore
 Phase 3: Post-Trim QC   →  sequali + multiqc (again)
@@ -11,6 +12,8 @@ Phase 4: Go/No-Go       →  compare before vs after
        ├─ FAIL → adjust params → return to Phase 2 (max 3 iterations)
        └─ Systemic batch FAIL → STOP: report to user
 ```
+
+**Phase 0 (Preflight)** is an **opt-in sub-skill** at `preflight/sequali-input-preflight/`. Run it before Phase 1 when input provenance is unclear (e.g., newly downloaded FASTQs, paired-end R1/R2, or any startup where you want md5 verification + paired-end read count parity + automatic platform detection). Phase 0 emits `params.json` (machine contract) + `preflight.md` (human audit) + `preflight_evidence.txt` (raw evidence). Phase 1 / Phase 2 refuse to run without `preflight.md` verdict ≥ `GO-WITH-WARNINGS`. If you trust the inputs, skip Phase 0 and go straight to Phase 1.
 
 ## Why Merged?
 
@@ -30,10 +33,18 @@ Running QC only once (before or after trimming) is a common mistake. This merged
 | `fastp` | Trimming & cleaning | Short reads (Illumina) |
 | `fastplong` | Trimming & cleaning | Long reads (ONT, PacBio) |
 | `trim_galore` | High-stringency adapter removal | Short reads (when fastp fails) |
+| `seqkit` | **Preflight only** — paired-end read counting + average read length for platform detection | All platforms |
 
 ## Quick Start
 
 ```bash
+# Phase 0 (optional): Preflight — input audit, md5, paired parity, platform detect
+# See preflight/sequali-input-preflight/SKILL.md for full docs.
+# Example: verify md5 + platform of raw reads
+pixi run seqkit stat raw_R1.fastq.gz raw_R2.fastq.gz
+md5sum -c raw_R1.fastq.gz.md5
+# Emits: params.json (platform.detected + verdict) + preflight.md (audit) + preflight_evidence.txt
+
 # Phase 1: Raw QC
 sequali R1.fastq.gz R2.fastq.gz --outdir qc_raw/ --json qc_raw/sample.json
 multiqc qc_raw/ -o qc_summary_raw/
@@ -50,6 +61,39 @@ multiqc qc_trimmed/ -o qc_summary_trimmed/
 
 # Phase 4: Compare before vs after — check adapter content ≈ 0%, read loss < 10%
 ```
+
+## Repository Layout
+
+```
+read-qc-trimming/
+├── SKILL.md                            # Master orchestrator (router)
+├── README.md                           # This file
+├── test_smoke.py                       # 40-test structural smoke test
+├── .gitignore
+└── preflight/
+    └── sequali-input-preflight/
+        └── SKILL.md                    # Phase 0 (optional, opt-in)
+                                         #   - input audit + file size
+                                         #   - md5 verification (if sidecars)
+                                         #   - paired-end read count parity
+                                         #   - platform auto-detection
+                                         #   - emits params.json + preflight.md + preflight_evidence.txt
+```
+
+## Changelog
+
+### v4 (2026-08-17) — Optional Phase 0 Preflight
+
+- **New**: `preflight/sequali-input-preflight/` sub-skill (v1.0.0). Mirrors the bettamt-preflight pattern from `bacterial-genome-analysis`.
+- **New**: `params.json` machine contract for Phase 1 / Phase 2 (platform detection, md5 status, paired parity).
+- **New**: `preflight.md` human audit trail with `GO / GO-WITH-WARNINGS / NO-GO` verdict.
+- **New**: 3 ask-user stop points (SP1–SP3): single FASTQ pairing, uBAM quality scores, large files missing md5.
+- **New**: `seqkit` added to pixi dependencies (preflight only).
+- **Test**: 40-test `test_smoke.py` enforces the preflight wiring and the no-regression rule on the bash recipe path.
+
+### v3 (2026-08-14) — Phase 1 (Raw QC) + Phase 2 (Trim) + Phase 3 (Post-Trim QC) + Phase 4 (Go/No-Go loop)
+
+- Original sandwich pattern. `fastplong` truncation note (no `--mask`/`--break`).
 
 ## Agent Compatibility
 

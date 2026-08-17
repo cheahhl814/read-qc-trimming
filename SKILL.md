@@ -1,8 +1,8 @@
 ---
 name: "read-qc-trimming"
-description: "End-to-end read quality control and trimming pipeline. QC raw reads (sequali + multiqc), identify issues, trim/clean (fastp/fastplong/trim_galore), then QC trimmed reads to verify. Sandwich pattern: QC → Trim → QC → Go/No-Go."
-version: 3
-updated: "2026-08-14"
+description: "End-to-end read quality control and trimming pipeline. Optional preflight gate (sub-skill: preflight/sequali-input-preflight) validates raw reads (file presence, md5 if provided, paired-end parity, platform detection) before QC raw reads (sequali + multiqc), identify issues, trim/clean (fastp/fastplong/trim_galore), then QC trimmed reads to verify. Sandwich pattern: Preflight → QC → Trim → QC → Go/No-Go."
+version: 4
+updated: "2026-08-17"
 triggers:
   - "quality control reads"
   - "trim reads"
@@ -19,12 +19,16 @@ triggers:
   - "sequencing quality check"
   - "adapter trimming"
   - "QC before alignment"
+  - "preflight raw reads"
+  - "validate fastq"
+  - "md5 check fastq"
 requires:
   - "sequali (conda: bioconda) — platform-agnostic QC metric generation"
   - "multiqc (conda: bioconda) — aggregate QC reporting"
   - "fastp (conda: bioconda) — short-read trimming"
   - "fastplong (conda: bioconda) — long-read trimming"
   - "trim_galore (conda: bioconda) — high-stringency short-read adapter removal"
+  - "seqkit (conda: bioconda) — paired-read counting + stats (preflight only)"
   - "pixi (pixi install) — environment management"
 ---
 
@@ -34,6 +38,11 @@ End-to-end quality control and trimming for sequencing reads. Follows a **sandwi
 
 ```
 ┌─────────────────────────────────────────────────────┐
+│  Phase 0: Preflight (Optional)                      │
+│  Validate: file presence, md5 if provided,         │
+│  paired-end parity, platform detection             │
+│  (sub-skill: preflight/sequali-input-preflight)    │
+├─────────────────────────────────────────────────────┤
 │  Phase 1: Raw QC      (sequali + multiqc)           │
 │  Identify: adapter content, quality decay, length,  │
 │  GC bias, overrepresented sequences                 │
@@ -65,6 +74,34 @@ End-to-end quality control and trimming for sequencing reads. Follows a **sandwi
 - To verify sequencing quality across a multi-sample batch.
 - When a unified QC approach is needed for projects with both short and long reads.
 
+## When to Run Phase 0 (Preflight)
+
+Run the preflight sub-skill (`preflight/sequali-input-preflight/`) before Phase 1 if any of the following apply:
+
+- **You just downloaded the data** and want to verify integrity (md5 checksum).
+- **You have paired-end reads** and want to confirm R1 and R2 have matched read counts before `fastp` runs.
+- **You're unsure of the platform** (Illumina / ONT / PacBio) and want auto-detection from extension + avg read length.
+- **The files are large** (> 5 GB) and you want a fast preflight step that catches missing/empty files before sequali runs.
+- **You're integrating with downstream skills** (e.g., `bacterial-genome-analysis`) that expect a `params.json` + `preflight.md` contract.
+
+If you trust the inputs (e.g., a collaborator already validated them, or you're iterating on a known dataset), skip Phase 0 and go straight to Phase 1.
+
+## Phase 0: Input Preflight (Optional)
+
+Run the sub-skill at `preflight/sequali-input-preflight/`. It audits input files, validates md5 if provided, checks paired-end parity, and detects platform. Output: `params.json` (machine contract) + `preflight.md` (human audit) + `preflight_evidence.txt` (raw evidence).
+
+**Verdict gate**: Phase 1 and Phase 2 refuse to run without `preflight.md` verdict ≥ `GO-WITH-WARNINGS`. If you skip Phase 0, the master skill does NOT block Phase 1 — the gate is opt-in via the sub-skill. Use the preflight whenever the input provenance is unclear or the data is from a new source.
+
+**For full preflight documentation, see** [`preflight/sequali-input-preflight/SKILL.md`](preflight/sequali-input-preflight/SKILL.md). Summary of what it does:
+
+1. **File presence + size** — refuses to proceed if any expected FASTQ is missing or empty.
+2. **md5 verification** (if `.fastq.gz.md5` sidecar present) — refuses to proceed on checksum mismatch.
+3. **Paired-end read count parity** — refuses to proceed if R1 and R2 read counts differ.
+4. **Platform detection** — auto-detects Illumina / ONT / PacBio from extension + avg read length; writes `platform.detected` to `params.json`.
+5. **Disk space** — refuses to proceed if < 10 GB free (Post-trim QC output can be ~5× input size).
+
+The sub-skill has 3 ask-user stop points (SP1–SP3) that fire only on ambiguous evidence (single FASTQ with unclear pairing, uBAM with unknown quality scores, large files with no md5).
+
 ## Prerequisites
 
 - **Environment**: This skill requires an active Pixi environment. Refer to [pixi-env-mgmt](../pixi-env-mgmt/SKILL.md) for setup.
@@ -72,14 +109,14 @@ End-to-end quality control and trimming for sequencing reads. Follows a **sandwi
 ```bash
 pixi init
 pixi workspace channel add conda-forge bioconda
-pixi add sequali multiqc fastp fastplong trim_galore
+pixi add sequali multiqc fastp fastplong trim_galore seqkit
 ```
 
 ## Phase 1: Raw Read QC
 
 ### 1.1 Identify Read Platform
 
-Determine read type from file metadata or user context to set correct quality thresholds:
+Determine read type from file metadata or user context to set correct quality thresholds. **If you ran Phase 0 (preflight), read `$RUN_DIR/params.json` `platform.detected` and trust it** — the preflight uses average read length from `seqkit stats` to disambiguate platforms automatically.
 
 | Platform                   | Read Type     | Expected Read Length | Quality Profile                  |
 | -------------------------- | ------------- | -------------------- | -------------------------------- |
@@ -345,6 +382,7 @@ After a GO decision, the agent should produce:
 
 ## Verification
 
+- [ ] Phase 0 (Preflight, optional): `preflight/sequali-input-preflight/` ran — `params.json` + `preflight.md` written with verdict ≥ `GO-WITH-WARNINGS`, md5 verified (if sidecars present), paired-end parity confirmed, platform detected
 - [ ] Phase 1 (Raw QC): `sequali` and `multiqc` ran successfully on raw reads
 - [ ] Phase 2 (Trim): Trimming tool selected based on Phase 1 findings and platform
 - [ ] Phase 3 (Post-Trim QC): `sequali` and `multiqc` ran successfully on trimmed reads
@@ -356,6 +394,19 @@ After a GO decision, the agent should produce:
 
 ## Related Skills
 
+- [preflight/sequali-input-preflight](preflight/sequali-input-preflight/SKILL.md) — **Optional preflight gate** (v1.0.0): validates file presence, md5 if provided, paired-end read count parity, and detects platform before Phase 1.
+- [bacterial-genome-analysis/preflight/genome-input-preflight](https://github.com/cheahhl814/bacterial-genome-analysis/tree/master/preflight/genome-input-preflight) — Sister preflight for **cleaned** reads (runs after this skill, before assembly).
 - [pixi-env-mgmt](../pixi-env-mgmt/SKILL.md) — Environment setup and tool installation
 - [read-mapping-alignment](../read-mapping-alignment/SKILL.md) — Next step after trimming: align reads to reference
 - [nextflow-pipelines](../nextflow-pipelines/SKILL.md) — Automate this pipeline with Nextflow
+
+## Common follow-ups
+
+| User says | What to do |
+| --- | --- |
+| "Run preflight before QC" | Invoke `preflight/sequali-input-preflight/`. It audits input files, validates md5 if provided, checks paired-end parity, and detects platform. The output (`params.json` + `preflight.md`) gates Phase 1 — without a `GO` or `GO-WITH-WARNINGS` verdict, Phase 1 should refuse. |
+| "md5 check failed" | HARD stop. Do not silently re-download. Ask the user to inspect the partial download / transfer. The preflight is read-only and must NOT delete files. |
+| "R1 and R2 read counts differ" | HARD stop. This will crash `fastp` mid-run. Recommend re-extracting from the source FASTQ or re-downloading both files together. |
+| "What platform is this?" | Read `$RUN_DIR/params.json` → `platform.detected`. If `ambiguous` (avg read length between 800 bp and 1.2 kb), ask the user to confirm. |
+| "I trust the inputs, skip preflight" | Skip Phase 0, go straight to Phase 1. The preflight is opt-in by design — it does not block. |
+| "Add md5 to an existing run" | Run preflight with the `.md5` sidecars in place. It overwrites the previous `params.json` + `preflight.md`. Phase 1 output is unchanged (sequali does not read md5). |
