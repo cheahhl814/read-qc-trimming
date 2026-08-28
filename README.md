@@ -68,7 +68,6 @@ multiqc qc_trimmed/ -o qc_summary_trimmed/
 read-qc-trimming/
 ├── SKILL.md                            # Master orchestrator (router)
 ├── README.md                           # This file
-├── test_smoke.py                       # 40-test structural smoke test
 ├── .gitignore
 └── preflight/
     └── sequali-input-preflight/
@@ -89,7 +88,7 @@ read-qc-trimming/
 - **New**: `preflight.md` human audit trail with `GO / GO-WITH-WARNINGS / NO-GO` verdict.
 - **New**: 3 ask-user stop points (SP1–SP3): single FASTQ pairing, uBAM quality scores, large files missing md5.
 - **New**: `seqkit` added to pixi dependencies (preflight only).
-- **Test**: 40-test `test_smoke.py` enforces the preflight wiring and the no-regression rule on the bash recipe path.
+- **Test**: the battle-test sub-skill (`battle-test/read-qc-trimming-battle-test/SKILL.md`) enforces the preflight wiring and the no-regression rule on the bash recipe path. The standalone `test_smoke.py` was removed from the published bundle as a developer-convenience artifact.
 
 ### v3 (2026-08-14) — Phase 1 (Raw QC) + Phase 2 (Trim) + Phase 3 (Post-Trim QC) + Phase 4 (Go/No-Go loop)
 
