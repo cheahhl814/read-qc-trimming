@@ -394,6 +394,25 @@ After a GO decision, the agent should produce:
 - [ ] Output files match input count for paired-end data (R1 and R2 have same line counts)
 - [ ] Summary report produced with before/after comparison
 
+## Update Check
+
+This skill ships a self-update check that compares the deployed `SKILL.md` (and the rest of the skill) against the upstream `github.com/cheahhl814/read-qc-trimming` repo via `git fetch` + SHA diff — no GitHub API call, no extra dependencies.
+
+```bash
+# From this skill's directory:
+python3 bin/skill-update-check.py
+# Or, for skills with pixi.toml:
+pixi run update-check
+# Verdict legend (exit code in parens):
+#   UP-TO-DATE       (0)  local HEAD matches origin/HEAD
+#   LOCAL-AHEAD      (0)  unpushed local commits; no action needed
+#   BEHIND-BY-N      (1)  upstream is N commits ahead → rsync from @skills/read-qc-trimming/
+#   OFFLINE          (2)  git fetch failed (no network / no credentials); informational
+#   NO-ORIGIN        (2)  no `origin` remote configured; informational
+```
+
+When `BEHIND-BY-N`, the script prints the canonical fix (rsync from `@skills/read-qc-trimming/` to `~/.pi/agent/skills/read-qc-trimming/` per AGENTS.md §4a, then `diff -rq` to verify). When `OFFLINE`, the script still prints `local_sha` + deployed version so the user can compare by hand. The full implementation is in `bin/skill-update-check.py` (synced from the [bioinfo-skill-creator](https://github.com/cheahhl814/bioinfo-skill-creator) meta-skill v1.1.0+).
+
 ## Related Skills
 
 - [preflight/sequali-input-preflight](preflight/sequali-input-preflight/SKILL.md) — **Optional preflight gate** (v1.0.0): validates file presence, md5 if provided, paired-end read count parity, and detects platform before Phase 1.
