@@ -79,20 +79,8 @@ read-qc-trimming/
                                          #   - emits params.json + preflight.md + preflight_evidence.txt
 ```
 
-## Changelog
-
-### v4 (2026-08-17) — Optional Phase 0 Preflight
-
-- **New**: `preflight/sequali-input-preflight/` sub-skill (v1.0.0). Mirrors the bettamt-preflight pattern from `bacterial-genome-analysis`.
-- **New**: `params.json` machine contract for Phase 1 / Phase 2 (platform detection, md5 status, paired parity).
-- **New**: `preflight.md` human audit trail with `GO / GO-WITH-WARNINGS / NO-GO` verdict.
-- **New**: 3 ask-user stop points (SP1–SP3): single FASTQ pairing, uBAM quality scores, large files missing md5.
-- **New**: `seqkit` added to pixi dependencies (preflight only).
-- **Test**: the battle-test sub-skill (`battle-test/read-qc-trimming-battle-test/SKILL.md`) enforces the preflight wiring and the no-regression rule on the bash recipe path. The standalone `test_smoke.py` was removed from the published bundle as a developer-convenience artifact.
-
-### v3 (2026-08-14) — Phase 1 (Raw QC) + Phase 2 (Trim) + Phase 3 (Post-Trim QC) + Phase 4 (Go/No-Go loop)
-
-- Original sandwich pattern. `fastplong` truncation note (no `--mask`/`--break`).
+> [!NOTE]
+> Current version: **v4** (2026-08-17) — adds an optional Phase 0 preflight (`preflight/sequali-input-preflight/`) with a `GO / GO-WITH-WARNINGS / NO-GO` gate. See `git log` for the full version history.
 
 ## Agent Compatibility
 
