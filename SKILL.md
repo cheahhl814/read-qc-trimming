@@ -419,7 +419,7 @@ When `BEHIND-BY-N`, the script prints the canonical fix (rsync from `@skills/rea
 - [bacterial-genome-analysis/preflight/genome-input-preflight](https://github.com/cheahhl814/bacterial-genome-analysis/tree/master/preflight/genome-input-preflight) — Sister preflight for **cleaned** reads (runs after this skill, before assembly).
 - [pixi-skill](https://github.com/cheahhl814/pixi-skill) — Environment setup and tool installation
 - [read-mapping-alignment](../read-mapping-alignment/SKILL.md) — Next step after trimming: align reads to reference
-- [nextflow-pipelines](../nextflow-pipelines/SKILL.md) — Automate this pipeline with Nextflow
+- [nextflow-pipelines](https://github.com/cheahhl814/nextflow-pipelines) — Automate this pipeline with Nextflow
 
 ## Common follow-ups
 
