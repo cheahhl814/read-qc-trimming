@@ -385,7 +385,7 @@ If the verdict is `NO-GO`, the pipeline stops. The user must fix the issue (re-d
 
 - [bacterial-genome-analysis/preflight/genome-input-preflight](https://github.com/cheahhl814/bacterial-genome-analysis/tree/master/preflight/genome-input-preflight) — sister preflight for cleaned reads (the next step in the pipeline).
 - [bettamt-preflight](https://github.com/cheahhl814/BettaMt-agents/blob/master/.agents/skills/bettamt-preflight/SKILL.md) — the canonical pattern this sub-skill mirrors.
-- [pixi-env-mgmt](https://github.com/cheahhl814/pixi-env-mgmt) — environment setup (this sub-skill requires `seqkit` for read counting; everything else is `bash` + `md5sum`).
+- [pixi-skill](https://github.com/cheahhl814/pixi-skill) — environment setup (this sub-skill requires `seqkit` for read counting; everything else is `bash` + `md5sum`).
 - [read-mapping-alignment](https://github.com/cheahhl814/read-mapping-alignment) — next step after `read-qc-trimming` finishes.
 
 ## 7. References

@@ -106,7 +106,7 @@ The sub-skill has 3 ask-user stop points (SP1–SP3) that fire only on ambiguous
 
 ## Prerequisites
 
-- **Environment**: This skill requires an active Pixi environment. Refer to [pixi-env-mgmt](../pixi-env-mgmt/SKILL.md) for setup.
+- **Environment**: This skill requires an active Pixi environment. Refer to [pixi-skill](https://github.com/cheahhl814/pixi-skill) for setup.
 
 ```bash
 pixi init
@@ -417,7 +417,7 @@ When `BEHIND-BY-N`, the script prints the canonical fix (rsync from `@skills/rea
 
 - [preflight/sequali-input-preflight](preflight/sequali-input-preflight/SKILL.md) — **Optional preflight gate** (v1.0.0): validates file presence, md5 if provided, paired-end read count parity, and detects platform before Phase 1.
 - [bacterial-genome-analysis/preflight/genome-input-preflight](https://github.com/cheahhl814/bacterial-genome-analysis/tree/master/preflight/genome-input-preflight) — Sister preflight for **cleaned** reads (runs after this skill, before assembly).
-- [pixi-env-mgmt](../pixi-env-mgmt/SKILL.md) — Environment setup and tool installation
+- [pixi-skill](https://github.com/cheahhl814/pixi-skill) — Environment setup and tool installation
 - [read-mapping-alignment](../read-mapping-alignment/SKILL.md) — Next step after trimming: align reads to reference
 - [nextflow-pipelines](../nextflow-pipelines/SKILL.md) — Automate this pipeline with Nextflow
 
