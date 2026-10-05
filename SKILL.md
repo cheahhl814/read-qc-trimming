@@ -1,8 +1,8 @@
 ---
 name: "read-qc-trimming"
 description: "End-to-end read quality control and trimming pipeline. Optional preflight gate (sub-skill: preflight/sequali-input-preflight) validates raw reads (file presence, md5 if provided, paired-end parity, platform detection) before QC raw reads (sequali + multiqc), identify issues, trim/clean (fastp/fastplong/trim_galore), then QC trimmed reads to verify. Sandwich pattern: Preflight → QC → Trim → QC → Go/No-Go."
-version: 4
-updated: "2026-08-17"
+version: 5
+updated: "2026-10-05"
 triggers:
   - "quality control reads"
   - "trim reads"
@@ -433,3 +433,14 @@ When `BEHIND-BY-N`, the script prints the canonical fix (rsync from `@skills/rea
 | "What platform is this?" | Read `$RUN_DIR/params.json` → `platform.detected`. If `ambiguous` (avg read length between 800 bp and 1.2 kb), ask the user to confirm. |
 | "I trust the inputs, skip preflight" | Skip Phase 0, go straight to Phase 1. The preflight is opt-in by design — it does not block. |
 | "Add md5 to an existing run" | Run preflight with the `.md5` sidecars in place. It overwrites the previous `params.json` + `preflight.md`. Phase 1 output is unchanged (sequali does not read md5). |
+
+## Dependencies → biodb-fetch (shared data lake)
+
+Consumes [biodb-fetch](https://github.com/cheahhl814/biodb-fetch) v1.0.0 (deployed at `~/.agents/skills/biodb-fetch/`) when raw reads are not local yet:
+
+- **Acquisition step (new)**: if the user names SRA runs (SRR/ERR/DRR accessions) instead of local FASTQ paths, route acquisition through biodb-fetch's `reads` domain BEFORE this skill's preflight:
+  `pixi run python3 ~/.agents/skills/biodb-fetch/scripts/sra_fetch.py download --srr <SRR...> --outdir ./work/reads/`
+- **What biodb-fetch owns**: ENA-first mirror routing (SRA-direct fallback), md5 cross-checked against ENA metadata, the fasterq-dump ~3x scratch-space trap, retries/rate limiting.
+- **Shared store**: payloads land in biodb-fetch's content-addressed `store/`; a repeated request for the same run returns a `cache=hit` manifest row — zero re-download across skills/batches. `--refresh` forces a fresh pull.
+- **Contract v2**: locate files via the emitted `manifest.tsv` (accession/source/url/path/md5/retrieval_date/tool/format/contract_version/cache) — never parse biodb-fetch internals.
+- **Degradation**: if biodb-fetch is unavailable (not deployed / no network), resolve accessions to FASTQ manually and note the deviation in the preflight report.

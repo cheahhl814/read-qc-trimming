@@ -39,6 +39,8 @@ Use this skill if:
 - You want a **machine-readable `params.json`** that Phase 1 / Phase 2 can read without re-deriving platform decisions.
 - You want a **human-readable `preflight.md`** documenting the audit trail (suitable for supplementary materials).
 
+If the reads are not local yet (the user names SRA runs instead of file paths), route acquisition through biodb-fetch's `reads` domain (see root SKILL.md §Dependencies → biodb-fetch). It returns md5-verified FASTQ paths via its manifest; this preflight then validates them exactly as for user-supplied files.
+
 Do NOT use this skill if:
 
 - You have **cleaned reads** — this skill is for raw reads. For cleaned reads, use `bacterial-genome-analysis/preflight/genome-input-preflight` instead.
