@@ -1,8 +1,8 @@
 ---
 name: "read-qc-trimming"
 description: "End-to-end read quality control and trimming pipeline. Optional preflight gate (sub-skill: preflight/sequali-input-preflight) validates raw reads (file presence, md5 if provided, paired-end parity, platform detection) before QC raw reads (sequali + multiqc), identify issues, trim/clean (fastp/fastplong/trim_galore), then QC trimmed reads to verify. Sandwich pattern: Preflight → QC → Trim → QC → Go/No-Go."
-version: 5
-updated: "2026-10-05"
+version: 6
+updated: "2026-10-12"
 triggers:
   - "quality control reads"
   - "trim reads"
@@ -411,7 +411,7 @@ pixi run update-check
 #   NO-ORIGIN        (2)  no `origin` remote configured; informational
 ```
 
-When `BEHIND-BY-N`, the script prints the canonical fix (rsync from `@skills/read-qc-trimming/` to `~/.pi/agent/skills/read-qc-trimming/` per AGENTS.md §4a, then `diff -rq` to verify). When `OFFLINE`, the script still prints `local_sha` + deployed version so the user can compare by hand. The full implementation is in `bin/skill-update-check.py` (synced from the [bioinfo-skill-creator](https://github.com/cheahhl814/bioinfo-skill-creator) meta-skill v1.1.0+).
+When `BEHIND-BY-N`, the script prints the canonical fix (rsync from `@skills/read-qc-trimming/` to `~/.pi/agent/skills/read-qc-trimming/` per AGENTS.md §4a, then `diff -rq` to verify). When `OFFLINE`, the script still prints `local_sha` + deployed version so the user can compare by hand. The full implementation is in `bin/skill-update-check.py` (synced from the [skill-forge](https://github.com/cheahhl814/bioinfo-skill-creator) meta-skill v1.1.0+).
 
 ## Related Skills
 
