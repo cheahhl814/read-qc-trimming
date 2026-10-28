@@ -371,7 +371,7 @@ If the verdict is `NO-GO`, the pipeline stops. The user must fix the issue (re-d
 - If `md5` is provided but the corresponding file is missing, treat as `NO-GO` (do not silently skip).
 - If `params.json` already exists at `$RUN_DIR`, the agent must ask: re-run preflight (overwrite) or abort?
 
-## 5. Troubleshooting signature library
+## Troubleshooting — Signature library
 
 | Symptom                                                       | Likely cause                          | Fix                                                                                  |
 | ------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------ |

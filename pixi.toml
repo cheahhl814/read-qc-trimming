@@ -1,0 +1,54 @@
+[workspace]
+name = "read-qc-trimming"
+# Tracks SKILL.md frontmatter `version: 6` — keep the two in sync when bumping.
+version = "6"
+description = "End-to-end read quality control and trimming pipeline: optional input preflight, raw-read QC (sequali + multiqc), trim/clean (fastp / fastplong / trim_galore), post-trim QC, then a Go/No-Go decision."
+channels = ["conda-forge", "bioconda"]
+platforms = ["linux-64", "osx-64", "osx-arm64"]
+# `pixi.lock` is gitignored (see .gitignore), so a fresh clone re-solves instead of
+# replaying pinned artifacts. `exclude-newer` bounds that re-solve to a known-good
+# window so the env does not drift between machines. Bump it deliberately whenever
+# you bump the dependencies below.
+exclude-newer = "2026-10-22"
+
+[dependencies]
+# Every tool below was confirmed to resolve via
+# `pixi search -c conda-forge -c bioconda <name>` (skill-forge preflight SP8).
+#
+# NAMING TRAP: the conda package is `trim-galore` (hyphen); the executable it
+# installs is `trim_galore` (underscore). `pixi add trim_galore` FAILS with
+# "No packages found matching 'trim_galore'" — use the hyphenated package name.
+python = ">=3.10,<4"       # JSON post-processing snippets + bin/skill-update-check.py
+sequali = ">=1.0.2,<2"    # Phase 1/3 — platform-agnostic QC metrics
+multiqc = ">=1.35,<2"     # Phase 1/3 — aggregate QC reporting
+fastp = ">=1.4.0,<2"      # Phase 2 — short-read trimming (default)
+fastplong = ">=0.7.1,<0.8" # Phase 2 — long-read (ONT/PacBio) trimming
+seqkit = ">=2.14.0,<3"    # Phase 0 preflight — paired-read counting + platform detection
+
+# trim-galore is published to Bioconda for linux-64 ONLY (no osx-64 / osx-arm64
+# build), so a flat dependency makes the whole workspace unsolvable on macOS.
+# Scoping it to the linux-64 target keeps the osx platforms installable: the
+# macOS env then simply has no `trim_galore` executable.
+[target.linux-64.dependencies]
+trim-galore = ">=2.3.0,<3" # Phase 2 — high-stringency short-read adapter removal
+
+[tasks]
+# Phase steps are agent instructions (SKILL.md), not scripts — these tasks are
+# echo placeholders that mark the phase boundary, matching the skill-forge
+# template. They deliberately do NOT pretend to run a script that does not exist.
+preflight = "echo 'Phase 0: run preflight/sequali-input-preflight (optional input validation)'"
+qc-raw = "echo 'Phase 1: sequali + multiqc on raw reads'"
+trim = "echo 'Phase 2: fastp / fastplong / trim_galore'"
+qc-trimmed = "echo 'Phase 3: sequali + multiqc on trimmed reads'"
+go-no-go = "echo 'Phase 4: compare before vs after, then GO / NO-GO'"
+# Self-check: compares this skill's git SHA to upstream (github.com/cheahhl814/read-qc-trimming).
+# See bin/skill-update-check.py for the verdict legend (UP-TO-DATE / BEHIND-BY-N / OFFLINE).
+update-check = "python3 bin/skill-update-check.py"
+# Rebuild the offline docs-corpus from the pinned environment (the flag
+# reference the agent reads instead of guessing). Use --check to verify
+# without rewriting.
+docs-corpus = "python3 bin/build-docs-corpus.py"
+docs-corpus-check = "python3 bin/build-docs-corpus.py --check"
+# Structural smoke tests: contract wiring, signature library, docs-corpus
+# freshness, manifest parse (battle-test §2-§5, as an executable gate).
+test-smoke = "python3 bin/skill-smoke.py"

@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/badge/version-4-blue)](#-installation)
 [![Type](https://img.shields.io/badge/type-agent%20skill-blueviolet)](#-installation)
-[![Built with](https://img.shields.io/badge/built%20with-bioinfo--skill--creator-orange)](https://github.com/cheahhl814/bioinfo-skill-creator)
+[![Built with](https://img.shields.io/badge/built%20with-skill--forge-orange)](https://github.com/cheahhl814/bioinfo-skill-creator)
 
 End-to-end read quality control and trimming pipeline. Optional preflight gate (sub-skill: preflight/sequali-input-preflight) validates raw reads (file presence, md5 if provided, paired-end parity, platform detection) before QC raw reads (sequali + multiqc), identify issues, trim/clean (fastp/fastplong/trim_galore), then QC trimmed reads to verify. Sandwich pattern: Preflight → QC → Trim → QC → Go/No-Go.
 
@@ -70,12 +70,15 @@ If you prefer to drive the phases yourself (or want to re-run a single phase):
 # Set your run directory (all phase artifacts land here)
 RUN_DIR=/path/to/run-dir
 
-pixi run preflight   # Phase 1 — validate inputs, write preflight.md + params.json
-pixi run run         # Phase 2 — execute the workflow (after preflight ≥ GO)
-pixi run qc          # Phase 3 — build the final report (after run completes)
-pixi run debug       # On failure — interpret stderr via the signature library
-pixi run battle-test # Verify the skill's structural integrity
+pixi run preflight   # Phase 0 (optional) — validate inputs, write preflight.md + params.json
+pixi run qc-raw      # Phase 1 — sequali + multiqc on the raw reads
+pixi run trim        # Phase 2 — fastp / fastplong / trim_galore
+pixi run qc-trimmed  # Phase 3 — sequali + multiqc on the trimmed reads
+pixi run go-no-go    # Phase 4 — compare before vs after, then GO / NO-GO
 ```
+
+> [!NOTE]
+> The phase tasks above are **phase markers, not runners** — the pipeline steps are agent instructions in `SKILL.md`, not scripts, so there is no `run.py` to call. The agent reads the phase section of `SKILL.md` and issues the real `sequali` / `fastp` / `multiqc` commands inside the activated environment. `pixi run update-check` is the one task that runs a real script.
 
 > [!IMPORTANT]
 > Each phase has an explicit **Inputs/Outputs contract** at the top of its sub-skill `SKILL.md`. If the upstream artifact is missing (e.g. you run `run` before `preflight` passed), the sub-skill refuses to proceed and tells you which phase to run first. Phases are gated on purpose — don't skip them.
@@ -97,19 +100,18 @@ All tools are resolved from conda-forge/bioconda via the pinned `pixi.toml`.
 
 | Tool | Version | Role |
 |:-----|:--------|:-----|
-| `------` | --------- | ---------- |
-| `sequali` | QC metric generation | All platforms (short + long reads) |
-| `multiqc` | Aggregate QC reporting | All platforms |
-| `fastp` | Trimming & cleaning | Short reads (Illumina) |
-| `fastplong` | Trimming & cleaning | Long reads (ONT, PacBio) |
-| `trim_galore` | High-stringency adapter removal | Short reads (when fastp fails) |
-| `seqkit` | **Preflight only** — paired-end read counting + average read length for platform detection | All platforms |
+| `sequali` | `>=1.0.2,<2` | QC metric generation — all platforms (short + long reads) |
+| `multiqc` | `>=1.35,<2` | Aggregate QC reporting — all platforms |
+| `fastp` | `>=1.4.0,<2` | Trimming & cleaning — short reads (Illumina) |
+| `fastplong` | `>=0.7.1,<0.8` | Trimming & cleaning — long reads (ONT, PacBio) |
+| `trim-galore` | `>=2.3.0,<3` | High-stringency adapter removal — short reads (when fastp fails); **linux-64 only** (Bioconda has no osx build; the executable is `trim_galore`) |
+| `seqkit` | `>=2.14.0,<3` | **Preflight only** — paired-end read counting + average read length for platform detection |
 
-Tool usage is grounded in the offline `docs-corpus/` snapshots (version-matched `--help`/`man` captures, upstream repo docs, and web docs as fallback) — the agent reads these instead of guessing flags.
+Tool usage is grounded in the offline `docs-corpus/` snapshots (version-matched `--help`/`man` captures, upstream repo docs, and web docs as fallback) — the agent reads these instead of guessing flags. Refresh them with `pixi run docs-corpus`; verify them with `pixi run docs-corpus-check`.
 
 ## 🔄 Update check
 
-Every skill built with [bioinfo-skill-creator](https://github.com/cheahhl814/bioinfo-skill-creator) ships a self-update check that compares the deployed git SHA against this upstream repo via `git fetch` — no GitHub API call, no extra dependencies.
+Every skill built with [skill-forge](https://github.com/cheahhl814/bioinfo-skill-creator) ships a self-update check that compares the deployed git SHA against this upstream repo via `git fetch` — no GitHub API call, no extra dependencies.
 
 ```bash
 pixi run update-check
@@ -130,19 +132,20 @@ read-qc-trimming/
 ├── SKILL.md                 # Master orchestrator (router — start here)
 ├── README.md                # This file
 ├── pixi.toml                # Pinned tool environment (pixi install)
+├── params.json              # Render input — tool inventory + version (tracked)
 ├── docs-corpus/             # Offline snapshots of upstream tool docs
-│   └── ------/
-│   └── sequali/
-│   └── multiqc/
-│   └── fastp/
-│   └── fastplong/
-│   └── trim_galore/
+│   ├── .fingerprints        # md5 + capture date per source (regenerated)
+│   ├── sequali/             #   cli-reference.md (verbatim --help) + github-readme.md
+│   ├── multiqc/
+│   ├── fastp/
+│   ├── fastplong/
+│   ├── trim_galore/
 │   └── seqkit/
-├── preflight/            # Phase sub-skill
-├── bin/
-│   └── skill-update-check.py  # Self-update check (pixi run update-check)
+├── preflight/               # Phase 0 sub-skill (optional input gate)
+│   └── sequali-input-preflight/SKILL.md
 └── bin/
-    └── scaffold-render.py     # Reproducibility — re-render the skill from params.json
+    ├── skill-update-check.py  # Self-update check (pixi run update-check)
+    └── build-docs-corpus.py   # Regenerate docs-corpus/ (pixi run docs-corpus)
 ```
 
 ## 🔒 Hard guarantees
@@ -158,7 +161,7 @@ This skill does not currently ship a Nextflow runner. For cohort/HPC execution, 
 
 ## Provenance
 
-Built with the [bioinfo-skill-creator](https://github.com/cheahhl814/bioinfo-skill-creator) meta-skill (v1.1.0), following the AiX-BIO skill convention (preflight → build → debug → battle-test evidence chain). Pattern adopted from:
+Built with the [skill-forge](https://github.com/cheahhl814/bioinfo-skill-creator) meta-skill (v1.1.0), following the AiX-BIO skill convention (preflight → build → debug → battle-test evidence chain). Pattern adopted from:
 
 - **BettaMt-agents** — https://github.com/cheahhl814/BettaMt-agents
 - **bacterial-genome-analysis** — https://github.com/cheahhl814/bacterial-genome-analysis

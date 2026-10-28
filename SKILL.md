@@ -106,13 +106,26 @@ The sub-skill has 3 ask-user stop points (SP1–SP3) that fire only on ambiguous
 
 ## Prerequisites
 
-- **Environment**: This skill requires an active Pixi environment. Refer to [pixi-skill](https://github.com/cheahhl814/pixi-skill) for setup.
+- **Environment**: This skill ships a pinned `pixi.toml` (channels: conda-forge, bioconda). Build it once from the skill directory — every tool the pipeline invokes then resolves inside that isolated env, with no `pixi global` install and no version conflict with other skills:
 
 ```bash
-pixi init
-pixi workspace channel add conda-forge bioconda
-pixi add sequali multiqc fastp fastplong trim_galore seqkit
+pixi install          # resolve + build the pinned environment
+pixi run update-check # confirm the deployed copy matches upstream
 ```
+
+| Tool | Role | Platforms |
+| --- | --- | --- |
+| `sequali` | QC metric generation (Phase 1/3) | all |
+| `multiqc` | aggregate QC reporting (Phase 1/3) | all |
+| `fastp` | short-read trimming (Phase 2, default) | all |
+| `fastplong` | long-read trimming (Phase 2, ONT/PacBio) | all |
+| `trim_galore` | high-stringency adapter removal (Phase 2) | **linux-64 only** |
+| `seqkit` | preflight read counting + platform detection (Phase 0) | all |
+
+> [!NOTE]
+> **Naming trap**: the conda package is `trim-galore` (hyphen); the executable it installs is `trim_galore` (underscore). `pixi add trim_galore` fails with *"No packages found matching 'trim_galore'"* — use the hyphenated package name.
+>
+> **Platform scope**: Bioconda publishes no `osx-64` / `osx-arm64` build of `trim-galore`, so `pixi.toml` scopes it to the `linux-64` target. The environment still installs on macOS, minus the `trim_galore` executable — use `fastp` for adapter removal there.
 
 ## Phase 1: Raw Read QC
 

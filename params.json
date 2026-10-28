@@ -1,0 +1,78 @@
+{
+  "skill_name": "read-qc-trimming",
+  "skill_version": "6",
+  "skill_updated": "2026-10-12",
+  "skill_short_description": "End-to-end read quality control and trimming pipeline. Optional preflight gate (sub-skill: preflight/sequali-input-preflight) validates raw reads (file presence, md5 if provided, paired-end parity, platform detection) before QC raw reads (sequali + multiqc), identify issues, trim/clean (fastp/fastplong/trim_galore), then QC trimmed reads to verify. Sandwich pattern: Preflight \u2192 QC \u2192 Trim \u2192 QC \u2192 Go/No-Go.",
+  "skill_description": "End-to-end read quality control and trimming pipeline. Optional preflight gate (sub-skill: preflight/sequali-input-preflight) validates raw reads (file presence, md5 if provided, paired-end parity, platform detection) before QC raw reads (sequali + multiqc), identify issues, trim/clean (fastp/fastplong/trim_galore), then QC trimmed reads to verify. Sandwich pattern: Preflight \u2192 QC \u2192 Trim \u2192 QC \u2192 Go/No-Go.",
+  "skill_triggers": [
+    "quality control reads",
+    "trim reads",
+    "QC fastq",
+    "clean raw reads",
+    "sequali",
+    "fastp",
+    "trim_galore",
+    "fastplong",
+    "read QC",
+    "read trimming",
+    "raw read quality",
+    "multiqc QC",
+    "sequencing quality check",
+    "adapter trimming",
+    "QC before alignment",
+    "preflight raw reads",
+    "validate fastq",
+    "md5 check fastq"
+  ],
+  "github_repo": "github.com/cheahhl814/read-qc-trimming",
+  "sub_skills": [
+    {
+      "name": "preflight",
+      "purpose": "**v1.0.0 (new).** Pre-flight gate for the read-qc-trimming pipeline. Mirrors the `bettamt-preflight` pattern from [Betta",
+      "artifact": "preflight.md"
+    }
+  ],
+  "tool_inventory": [
+    {
+      "name": "sequali",
+      "version": ">=1.0.2,<2",
+      "role": "QC metric generation — all platforms (short + long reads)"
+    },
+    {
+      "name": "multiqc",
+      "version": ">=1.35,<2",
+      "role": "Aggregate QC reporting — all platforms"
+    },
+    {
+      "name": "fastp",
+      "version": ">=1.4.0,<2",
+      "role": "Trimming & cleaning — short reads (Illumina)"
+    },
+    {
+      "name": "fastplong",
+      "version": ">=0.7.1,<0.8",
+      "role": "Trimming & cleaning — long reads (ONT, PacBio)"
+    },
+    {
+      "name": "trim_galore",
+      "version": ">=2.3.0,<3",
+      "role": "High-stringency adapter removal — short reads (when fastp fails); linux-64 only (Bioconda has no osx build; the conda package is `trim-galore`, the executable is `trim_galore`)"
+    },
+    {
+      "name": "seqkit",
+      "version": ">=2.14.0,<3",
+      "role": "Preflight only — paired-end read counting + average read length for platform detection"
+    }
+  ],
+  "skill_title": "read-qc-trimming",
+  "github_org": "cheahhl814",
+  "pixi_channels": [
+    "conda-forge",
+    "bioconda"
+  ],
+  "license": "MIT",
+  "target_tiers": [
+    "large"
+  ],
+  "with_nextflow_runner": false
+}

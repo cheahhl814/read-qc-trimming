@@ -1,8 +1,17 @@
 #!/usr/bin/env python3
-"""read-qc-trimming skill update check (v4).
+"""read-qc-trimming skill update check (v6).
 
 Compares the deployed skill's git SHA + version to the upstream repo
-(github.com/cheahhl814/read-qc-trimming). No network calls beyond `git fetch`.
+(github.com/cheahhl814/read-qc-trimming).
+No network calls beyond `git fetch`.
+
+Template variables:
+  skill_name     the skill's own name (docstring + deploy path)
+  skill_version  the skill's version string
+  upstream_repo  GitHub repo name; defaults to skill_name. Set this for a
+                 sub-skill of a monorepo (e.g. skill_name="occurrence-crosscheck/
+                 crosscheck", upstream_repo="occurrence-crosscheck").
+  deploy_path    path shown in the rsync fix; defaults to skill_name.
 
 Verdicts:
   UP-TO-DATE       local HEAD matches origin/HEAD (or origin/<default-branch>)
@@ -17,7 +26,8 @@ Exit codes:
   1  BEHIND-BY-N (re-run deploy sync per AGENTS.md §4a)
   2  OFFLINE / NO-ORIGIN / NO-GIT (informational; not an error)
 
-Usage: pixi run update-check
+Usage: python3 bin/skill-update-check.py
+       (in skills that ship a pixi.toml this is also wired as `pixi run update-check`)
 """
 
 from __future__ import annotations
@@ -150,10 +160,12 @@ def main() -> int:
         print("  Option A (canonical, no git auth needed):")
         print("    1. rsync -a --exclude='.git' \\")
         print("         <skill_source>/ \\")
-        print("         ~/.pi/agent/skills/<skill_target>/")
+        print("         ~/.agents/skills/read-qc-trimming/")
         print("    2. diff -rq <src> <dst> --exclude='.git'   # verify zero drift")
-        print("         (skill_source = this skill's source checkout,")
-        print("          skill_target = the matching path under ~/.pi/agent/skills/)")
+        print("         (skill_source = this skill's source checkout (the @skills/")
+        print("          git tree), target = ~/.agents/skills/read-qc-trimming/ —")
+        print("          usually a symlink into the source tree, per the one-way")
+        print("          sync convention)")
         print("  Option B (if you have a git checkout of this skill):")
         print(f"    git pull --ff-only origin $(basename {origin_ref.replace('refs/remotes/origin/', '')})")
         return 1
